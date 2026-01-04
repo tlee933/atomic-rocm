@@ -1,0 +1,11 @@
+# Atomic-ROCm ISO Configuration
+name = "atomic-rocm"
+[[customizations.user]]
+name = "atomic"
+description = "Atomic-ROCm User"
+password = "$6$rounds=4096$saltsalt$fHO.R6q8j0dT8gZPGKRLz/6V9w1M1U8P7l4Q5vK8VqB4n7F3L2W0E9R8T7Y6U5I4O3P2A1S0"
+groups = ["wheel", "sudo"]
+
+[[customizations.sshkey]]
+user = "atomic"
+key = ""

@@ -3,9 +3,13 @@
 # Mix of Bazzite (gaming) + Aurora (KDE) with TheRock custom ROCm
 # Public project - https://github.com/tlee933/atomic-rocm
 
-ARG FEDORA_MAJOR_VERSION="${FEDORA_MAJOR_VERSION:-40}"
+ARG FEDORA_MAJOR_VERSION="${FEDORA_MAJOR_VERSION:-42}"
 
-# Base: Bazzite (gaming optimized) - includes Steam, GameMode, MangoHud
+# Stage 1: Import TheRock ROCm build
+FROM scratch AS rocm-source
+COPY TheRock/install /rocm
+
+# Stage 2: Base image
 FROM ghcr.io/ublue-os/bazzite:${FEDORA_MAJOR_VERSION}
 
 # Metadata
@@ -69,14 +73,11 @@ RUN rpm-ostree install \
     toolbox
 
 # Copy custom ROCm 7.11 from TheRock build (gfx1201 support)
-# This will be mounted/copied from host during build
-# For now, create directory structure
-RUN mkdir -p /opt/rocm
+COPY --from=rocm-source /rocm /opt/rocm
 
-# Note: Actual ROCm files should be copied during build:
-# podman build --volume /home/hashcat/TheRock/install:/rocm-build:ro -t atomic-rocm .
-# Then in Containerfile:
-# COPY --from=rocm-build /rocm-build /opt/rocm
+# Set ownership and permissions for ROCm
+RUN chown -R root:root /opt/rocm && \
+    chmod -R a+rX /opt/rocm
 
 # Configure environment for custom ROCm stack
 # ROCm is for AI/ML compute only, NOT for gaming graphics
