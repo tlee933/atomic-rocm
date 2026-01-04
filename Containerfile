@@ -1,6 +1,6 @@
-# Atomic-ROCm: Gaming + AI workstation with custom ROCm 7.11
+# Atomic-ROCm: KDE Dev Workstation + Gaming + AI with custom ROCm 7.11
 # Exclusively for AMD Radeon AI PRO R9700 (gfx1201)
-# Mix of Bazzite (gaming) + Aurora (KDE) with TheRock custom ROCm
+# Base: Aurora-DX (KDE Plasma 6 + Dev Tools) + Gaming + TheRock ROCm
 # Public project - https://github.com/tlee933/atomic-rocm
 #
 # Built with AI assistance from Anthropic's Claude 🤖
@@ -12,8 +12,8 @@ ARG FEDORA_MAJOR_VERSION="${FEDORA_MAJOR_VERSION:-42}"
 FROM scratch AS rocm-source
 COPY TheRock/install /rocm
 
-# Stage 2: Base image
-FROM ghcr.io/ublue-os/bazzite:${FEDORA_MAJOR_VERSION}
+# Stage 2: Base image (Aurora-DX = KDE Plasma 6 + Developer Tools)
+FROM ghcr.io/ublue-os/aurora-dx:${FEDORA_MAJOR_VERSION}
 
 # Metadata
 LABEL org.opencontainers.image.title="Atomic-ROCm"
@@ -254,6 +254,15 @@ RUN echo "gfx1201" > /etc/atomic-rocm-target && \
 
 # Commit ostree changes
 RUN ostree container commit
+
+# Configure ostree for bootc compatibility (AFTER commit!)
+RUN mkdir -p /usr/lib/ostree && \
+    cat > /usr/lib/ostree/prepare-root.conf << 'OSTREE'
+[sysroot]
+readonly=true
+[etc]
+transient=false
+OSTREE
 
 # Runtime information
 RUN cat > /etc/motd << 'EOF'
