@@ -2,6 +2,9 @@
 # Exclusively for AMD Radeon AI PRO R9700 (gfx1201)
 # Mix of Bazzite (gaming) + Aurora (KDE) with TheRock custom ROCm
 # Public project - https://github.com/tlee933/atomic-rocm
+#
+# Built with AI assistance from Anthropic's Claude 🤖
+# Thanks to Jorge Castro (Universal Blue) and Kyle Gospodnetich (Bazzite) 🎩🎸
 
 ARG FEDORA_MAJOR_VERSION="${FEDORA_MAJOR_VERSION:-42}"
 
@@ -171,6 +174,79 @@ background_alpha=0.4
 font_size=24
 EOF
 
+# ============================================
+# GLASSY THEMING & VISUAL EFFECTS
+# ============================================
+
+# Install theme packages (cloud-native: minimal base!)
+RUN rpm-ostree install \
+    papirus-icon-theme
+
+# Copy custom theming assets
+COPY wallpapers/atomic-rocm-ai-glow.jpg /usr/share/backgrounds/atomic-rocm/
+COPY wallpapers/atomic-rocm-neural-net.jpg /usr/share/backgrounds/atomic-rocm/
+COPY wallpapers/atomic-rocm-code.jpg /usr/share/backgrounds/atomic-rocm/
+COPY wallpapers/plasma-colorscheme/AtomicROCm.colors /usr/share/color-schemes/
+COPY konsole/AtomicROCm.colorscheme /usr/share/konsole/
+
+# Copy ujust recipes for user setup
+COPY just/install-brew-essentials.just /usr/share/ublue-os/just/
+COPY just/install-ml-tools.just /usr/share/ublue-os/just/
+COPY just/setup-rocm-dev.just /usr/share/ublue-os/just/
+
+# Set default wallpaper (Plasma 6)
+RUN mkdir -p /etc/skel/.config && \
+    kwriteconfig6 --file /etc/skel/.config/plasmarc \
+        --group Wallpaper --key Image "/usr/share/backgrounds/atomic-rocm/atomic-rocm-ai-glow.jpg"
+
+# Apply custom color scheme (Plasma 6)
+RUN kwriteconfig6 --file /etc/skel/.config/kdeglobals \
+        --group General --key ColorScheme "AtomicROCm" && \
+    kwriteconfig6 --file /etc/skel/.config/kdeglobals \
+        --group Icons --key Theme "Papirus-Dark"
+
+# Enable compositor with blur (glassy windows!)
+RUN kwriteconfig6 --file /etc/skel/.config/kwinrc --group Compositing --key Enabled true && \
+    kwriteconfig6 --file /etc/skel/.config/kwinrc --group Compositing --key Backend OpenGL && \
+    kwriteconfig6 --file /etc/skel/.config/kwinrc --group Plugins --key blurEnabled true && \
+    kwriteconfig6 --file /etc/skel/.config/kwinrc --group Effect-blur --key BlurStrength 10 && \
+    kwriteconfig6 --file /etc/skel/.config/kwinrc --group Effect-blur --key NoiseStrength 3
+
+# Glassy window decorations (using default Breeze with transparency)
+# Note: klassy not available in F42, using Breeze with blur instead
+RUN kwriteconfig6 --file /etc/skel/.config/kwinrc --group org.kde.kdecoration2 --key BorderSize Normal && \
+    kwriteconfig6 --file /etc/skel/.config/kwinrc --group org.kde.kdecoration2 --key ButtonsOnLeft "MS" && \
+    kwriteconfig6 --file /etc/skel/.config/kwinrc --group org.kde.kdecoration2 --key ButtonsOnRight "HIAX"
+
+# Transparent panel (80% opacity)
+RUN kwriteconfig6 --file /etc/skel/.config/plasmashellrc \
+    --group PlasmaViews --group Panel --group Defaults --key panelOpacity 80
+
+# Enable fun effects
+RUN kwriteconfig6 --file /etc/skel/.config/kwinrc --group Plugins --key wobblywindowsEnabled true && \
+    kwriteconfig6 --file /etc/skel/.config/kwinrc --group Plugins --key magiclampEnabled true && \
+    kwriteconfig6 --file /etc/skel/.config/kwinrc --group Plugins --key slideEnabled true
+
+# Konsole transparency (70% with blur)
+RUN mkdir -p /etc/skel/.local/share/konsole && \
+    cat > /etc/skel/.local/share/konsole/AtomicROCm.profile << 'KONSOLE'
+[Appearance]
+ColorScheme=AtomicROCm
+
+[General]
+Name=Atomic ROCm
+Opacity=0.7
+Blur=true
+Parent=FALLBACK/
+KONSOLE
+
+RUN kwriteconfig6 --file /etc/skel/.config/konsolerc \
+    --group "Desktop Entry" --key DefaultProfile "AtomicROCm.profile"
+
+# ============================================
+# END THEMING
+# ============================================
+
 # Set gfx1201 as the only supported architecture
 # Create a marker file that tools can check
 RUN echo "gfx1201" > /etc/atomic-rocm-target && \
@@ -184,17 +260,23 @@ RUN cat > /etc/motd << 'EOF'
 
    ╔═══════════════════════════════════════════════════════════╗
    ║                     Atomic-ROCm                           ║
-   ║            Gaming + AI for AMD R9700 (gfx1201)            ║
+   ║   Glassy KDE Plasma 6 + Gaming + AI (AMD R9700)          ║
    ║                                                           ║
-   ║  GPU:     AMD Radeon AI PRO R9700 (32GB VRAM)            ║
-   ║  Gaming:  Vulkan/Mesa (RADV) + Steam + GameMode          ║
-   ║  AI/ML:   ROCm 7.11 (TheRock) for GPU compute            ║
+   ║  GPU:      AMD Radeon AI PRO R9700 (32GB VRAM)           ║
+   ║  Gaming:   Vulkan/Mesa (RADV) + Steam + GameMode         ║
+   ║  AI/ML:    ROCm 7.11 (TheRock) for GPU compute           ║
+   ║  Theme:    Glassy blue/cyan/purple with Papirus icons    ║
    ║                                                           ║
    ╚═══════════════════════════════════════════════════════════╝
 
   Graphics stack:
     Gaming:  Mesa/RADV → Vulkan/OpenGL → Steam/Proton
-    AI/ML:   ROCm 7.11 → HIP/OpenCL → PyTorch (in Distrobox)
+    AI/ML:   ROCm 7.11 → HIP/OpenCL → PyTorch
+
+  First boot setup (run once):
+    ujust install-brew-essentials   - CLI tools (ripgrep, fd, etc.)
+    ujust install-ml-tools          - AI/ML stack (PyTorch, Jupyter)
+    ujust setup-rocm-dev            - ROCm development environment
 
   Quick commands:
     steam                - Launch Steam (uses Vulkan/Mesa)
@@ -202,9 +284,8 @@ RUN cat > /etc/motd << 'EOF'
     clinfo               - Verify OpenCL (for AI/ML)
     gamemode-status      - Check GameMode
 
-  Environment configured for gfx1201:
-    ROCM_PATH=/opt/rocm (for AI/ML compute)
-    HSA_OVERRIDE_GFX_VERSION=12.0.1 (for compute workloads)
+  Built with AI assistance from Claude 🤖
+  Thanks to Jorge Castro (Universal Blue) and Kyle Gospodnetich (Bazzite)
 
 EOF
 
