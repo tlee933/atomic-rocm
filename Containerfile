@@ -256,12 +256,13 @@ RUN echo "gfx1201" > /etc/atomic-rocm-target && \
 RUN ostree container commit
 
 # Configure ostree for bootc compatibility (AFTER commit!)
+# Match Aurora-DX format with composefs support
 RUN mkdir -p /usr/lib/ostree && \
     cat > /usr/lib/ostree/prepare-root.conf << 'OSTREE'
+[composefs]
+enabled = yes
 [sysroot]
-readonly=true
-[etc]
-transient=false
+readonly = true
 OSTREE
 
 # Runtime information
