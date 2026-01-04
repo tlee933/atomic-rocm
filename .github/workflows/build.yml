@@ -1,0 +1,98 @@
+name: Build Atomic-ROCm Image
+
+on:
+  schedule:
+    # Rebuild daily at 2 AM UTC to stay current with upstream
+    - cron: '0 2 * * *'
+  push:
+    branches:
+      - main
+    paths:
+      - 'Containerfile'
+      - '.github/workflows/build.yml'
+  pull_request:
+    branches:
+      - main
+  workflow_dispatch:
+
+env:
+  IMAGE_REGISTRY: ghcr.io/${{ github.repository_owner }}
+  IMAGE_NAME: atomic-rocm
+
+jobs:
+  build-and-push:
+    name: Build and Push Atomic-ROCm
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+      id-token: write
+
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Generate Image Metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE_REGISTRY }}/${{ env.IMAGE_NAME }}
+          tags: |
+            # Tag with latest for main branch
+            type=raw,value=latest,enable={{is_default_branch}}
+            # Tag with date (e.g., 40-20250103)
+            type=raw,value={{date 'YYYYMMDD'}},enable={{is_default_branch}}
+            # Tag with Fedora version
+            type=raw,value=40,enable={{is_default_branch}}
+            # Tag with git commit SHA
+            type=sha,prefix={{branch}}-
+
+      - name: Build Image
+        id: build
+        uses: redhat-actions/buildah-build@v2
+        with:
+          containerfiles: ./Containerfile
+          image: ${{ env.IMAGE_NAME }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          oci: true
+
+      - name: Push to GitHub Container Registry
+        id: push
+        uses: redhat-actions/push-to-registry@v2
+        if: github.event_name != 'pull_request'
+        with:
+          image: ${{ steps.build.outputs.image }}
+          tags: ${{ steps.build.outputs.tags }}
+          registry: ${{ env.IMAGE_REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Sign Image with Cosign
+        if: github.event_name != 'pull_request'
+        run: |
+          echo "Image signing not yet configured"
+          echo "Future: cosign sign --yes ${{ env.IMAGE_REGISTRY }}/${{ steps.build.outputs.image }}@${{ steps.push.outputs.digest }}"
+
+      - name: Print Image Info
+        if: github.event_name != 'pull_request'
+        run: |
+          echo "## Atomic-ROCm Build Complete! 🚀" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Image:** \`${{ env.IMAGE_REGISTRY }}/${{ steps.build.outputs.image }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Tags:**" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo "${{ steps.build.outputs.tags }}" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Digest:** \`${{ steps.push.outputs.digest }}\`" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Install Instructions" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`bash" >> $GITHUB_STEP_SUMMARY
+          echo "# Rebase to Atomic-ROCm" >> $GITHUB_STEP_SUMMARY
+          echo "rpm-ostree rebase ostree-unverified-image:docker://${{ env.IMAGE_REGISTRY }}/${{ steps.build.outputs.image }}:latest" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "# Reboot" >> $GITHUB_STEP_SUMMARY
+          echo "systemctl reboot" >> $GITHUB_STEP_SUMMARY
+          echo "\`\`\`" >> $GITHUB_STEP_SUMMARY
