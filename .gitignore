@@ -24,3 +24,6 @@ test-*
 
 # Logs
 *.log
+TheRock/
+*.iso
+output/
